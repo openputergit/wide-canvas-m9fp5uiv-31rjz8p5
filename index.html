@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blockchain Voting System</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .party-card {
+      transition: transform 0.2s;
+    }
+    .party-card:hover {
+      transform: scale(1.02);
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #1b8d76;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    body {
+      --primary-color: #1b8d76;
+      --secondary-color: #b7701f;
+    }
+    .bg-primary {
+      background-color: var(--primary-color);
+    }
+    .bg-secondary {
+      background-color: var(--secondary-color);
+    }
+    .hover\:bg-primary-dark:hover {
+      background-color: #156e5c;
+    }
+    .hover\:bg-secondary-dark:hover {
+      background-color: #9a5e19;
+    }
+    .text-primary {
+      color: var(--primary-color);
+    }
+    .text-secondary {
+      color: var(--secondary-color);
+    }
+    .border-primary {
+      border-color: var(--primary-color);
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+
+<!-- Already Voted Popup Modal -->
+<div id="alreadyVotedModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded-lg shadow-lg text-center max-w-sm w-full">
+    <h2 class="text-xl font-semibold mb-4 text-red-600">You've Already Voted!</h2>
+    <p class="text-gray-700 mb-6">You can't vote again, but you can still view the results.</p>
+    <button onclick="closeModal()" class="bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark">Okay</button>
+  </div>
+</div>
+
+<!-- Loading Modal -->
+<div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded-lg shadow-lg text-center max-w-sm w-full">
+    <div class="flex justify-center mb-4">
+      <div class="spinner"></div>
+    </div>
+    <p id="loadingText" class="text-gray-700">Processing your transaction...</p>
+  </div>
+</div>
+
+<!-- Connect Wallet Modal -->
+<div id="walletModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded-lg shadow-lg text-center max-w-sm w-full">
+    <h2 class="text-xl font-semibold mb-4 text-primary">Connect Your Wallet</h2>
+    <p class="text-gray-700 mb-6">Please connect your Ethereum wallet to continue.</p>
+    <button onclick="connectWallet()" class="bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark">
+      <i class="bi bi-wallet2 mr-2"></i>Connect MetaMask
+    </button>
+    <button onclick="closeWalletModal()" class="mt-4 text-gray-500 hover:text-gray-700">Cancel</button>
+  </div>
+</div>
+
+<!-- Network Error Modal -->
+<div id="networkErrorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded-lg shadow-lg text-center max-w-sm w-full">
+    <h2 class="text-xl font-semibold mb-4 text-red-600">Wrong Network</h2>
+    <p class="text-gray-700 mb-6">Please connect to the Ethereum Mainnet to use this application.</p>
+    <button onclick="switchNetwork()" class="bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark">
+      Switch Network
+    </button>
+  </div>
+</div>
+
+<!-- Login Panel -->
+<div id="loginPanel" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+    <div class="text-center mb-8">
+      <img src="https://firebasestorage.googleapis.com/v0/b/widecanvas-d0dd4.appspot.com/o/logos%2Fv.jpg?alt=media&token=869fc5c4-cb20-4730-b090-82e874fd451e"
+           alt="Logo" class="mx-auto h-16 mb-4">
+      <h2 class="text-2xl font-bold text-gray-800">Secure Blockchain Voting</h2>
+    </div>
+    
+    <!-- Login Type Selector -->
+    <div class="mb-6 flex border rounded-lg overflow-hidden">
+      <button id="voterTabBtn" onclick="showTab('voter')" 
+              class="flex-1 py-2 text-center font-medium bg-primary text-white">
+        Voter Login
+      </button>
+      <button id="adminTabBtn" onclick="showTab('admin')" 
+              class="flex-1 py-2 text-center font-medium bg-gray-200 text-gray-700">
+        Admin Login
+      </button>
+    </div>
+    
+    <!-- Voter Login Form -->
+    <div id="voterLoginForm" class="space-y-6">
+      <form id="loginForm" class="space-y-6">
+        <div>
+          <label class="text-gray-700">Voter ID</label>
+          <input type="text" id="voterId" class="w-full px-4 py-2 border rounded-lg" required>
+        </div>
+        <div>
+          <label class="text-gray-700">Password</label>
+          <input type="password" id="password" class="w-full px-4 py-2 border rounded-lg" required>
+        </div>
+        <button type="submit"
+                class="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary-dark">
+          Login
+        </button>
+      </form>
+      <div id="otpSection" class="hidden mt-6">
+        <input type="text" id="otp" placeholder="Enter OTP"
+               class="w-full px-4 py-2 border rounded-lg mb-4">
+        <button onclick="verifyOTP()"
+                class="w-full bg-secondary text-white py-2 rounded-lg hover:bg-secondary-dark">
+          Verify OTP
+        </button>
+      </div>
+    </div>
+    
+    <!-- Admin Login Form -->
+    <div id="adminLoginForm" class="space-y-6 hidden">
+      <form id="adminForm" class="space-y-6">
+        <div>
+          <label class="text-gray-700">Admin ID</label>
+          <input type="text" id="adminId" class="w-full px-4 py-2 border rounded-lg" required>
+        </div>
+        <div>
+          <label class="text-gray-700">Password</label>
+          <input type="password" id="adminPassword" class="w-full px-4 py-2 border rounded-lg" required>
+        </div>
+        <button type="submit"
+                class="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary-dark">
+          Admin Login
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Voting Dashboard -->
+<div id="votingDashboard" class="hidden min-h-screen p-4">
+  <nav class="bg-white shadow-md p-4 mb-8">
+    <div class="container mx-auto flex flex-wrap justify-between items-center">
+      <div class="flex items-center">
+        <img src="https://firebasestorage.googleapis.com/v0/b/widecanvas-d0dd4.appspot.com/o/logos%2Fv.jpg?alt=media&token=869fc5c4-cb20-4730-b090-82e874fd451e"
+             alt="Logo" class="h-10">
+        <h1 class="text-xl font-bold text-primary ml-3 hidden sm:block">Blockchain Voting System</h1>
+      </div>
+      <div class="flex items-center space-x-4 mt-2 sm:mt-0">
+        <div id="walletStatus" class="text-sm text-gray-600">Wallet: Not Connected</div>
+        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto">
+    <div class="mb-8 bg-white rounded-lg shadow p-6">
+      <img src="https://firebasestorage.googleapis.com/v0/b/widecanvas-d0dd4.appspot.com/o/additional-images%2Fmain.jpg?alt=media&token=5d4bcc7a-0d80-4707-87bd-7beca00660d4" 
+           alt="Voting Banner" class="w-full h-48 object-cover rounded-lg mb-4">
+      <h2 class="text-2xl font-bold text-primary mb-2">Cast Your Vote Securely</h2>
+      <p class="text-gray-700">Your vote is encrypted and stored securely on the blockchain, ensuring complete transparency and security.</p>
+    </div>
+    
+    <div id="partyGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"></div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-xl font-bold mb-4 text-primary">Live Voting Results</h3>
+      <div id="results" class="space-y-4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Dashboard -->
+<div id="adminDashboard" class="hidden min-h-screen p-4">
+  <nav class="bg-white shadow-md p-4 mb-8">
+    <div class="container mx-auto flex justify-between items-center">
+      <div class="flex items-center">
+        <img src="https://firebasestorage.googleapis.com/v0/b/widecanvas-d0dd4.appspot.com/o/logos%2Fv.jpg?alt=media&token=869fc5c4-cb20-4730-b090-82e874fd451e"
+             alt="Logo" class="h-10">
+        <h1 class="text-xl font-bold text-primary ml-3 hidden sm:block">Admin Dashboard</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div id="adminWalletStatus" class="text-sm text-gray-600">Wallet: Not Connected</div>
+        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <!-- Voter Approval Panel -->
+      <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+        <h3 class="text-xl font-bold mb-4 text-primary">Voter Approval Requests</h3>
+        <div id="voterRequests" class="overflow-x-auto">
+          <table class="min-w-full bg-white">
+            <thead>
+              <tr>
+                <th class="py-2 px-4 border-b text-left">Voter ID</th>
+                <th class="py-2 px-4 border-b text-left">Wallet Address</th>
+                <th class="py-2 px-4 border-b text-left">Status</th>
+                <th class="py-2 px-4 border-b text-left">Action</th>
+              </tr>
+            </thead>
+            <tbody id="voterRequestsBody">
+              <tr>
+                <td class="py-2 px-4 border-b">shrutz</td>
+                <td class="py-2 px-4 border-b">0x1234...5678</td>
+                <td class="py-2 px-4 border-b"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Pending</span></td>
+                <td class="py-2 px-4 border-b">
+                  <button class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Approve</button>
+                  <button class="px-3 py-1 bg-red-600 text-white rounded-lg text-sm ml-2 hover:bg-red-700">Reject</button>
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-4 border-b">vedya</td>
+                <td class="py-2 px-4 border-b">0x9876...5432</td>
+                <td class="py-2 px-4 border-b"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Pending</span></td>
+                <td class="py-2 px-4 border-b">
+                  <button class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Approve</button>
+                  <button class="px-3 py-1 bg-red-600 text-white rounded-lg text-sm ml-2 hover:bg-red-700">Reject</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Admin Control Panel -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-xl font-bold mb-4 text-primary">Admin Control Panel</h3>
+        <div class="space-y-4">
+          <div>
+            <h4 class="font-medium mb-2 text-gray-700">Add New Voter</h4>
+            <div class="flex space-x-2">
+              <input type="text" id="newVoterId" placeholder="Voter ID" class="flex-1 px-3 py-2 border rounded-md">
+              <input type="text" id="voterWalletAddress" placeholder="Wallet Address" class="flex-1 px-3 py-2 border rounded-md">
+            </div>
+            <button id="addVoterBtn" class="mt-2 w-full bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark">
+              Add Voter
+            </button>
+          </div>
+          
+          <div class="pt-4 border-t">
+            <h4 class="font-medium mb-2 text-gray-700">Election Controls</h4>
+            <div class="space-y-2">
+              <button id="startElectionBtn" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                Start Election
+              </button>
+              <button id="pauseElectionBtn" class="w-full bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600">
+                Pause Election
+              </button>
+              <button id="endElectionBtn" class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                End Election
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Voting Statistics -->
+      <div class="bg-white rounded-lg shadow p-6 xl:col-span-2">
+        <h3 class="text-xl font-bold mb-4 text-primary">Voting Statistics</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-gray-100 p-4 rounded-lg">
+            <h4 class="text-gray-500 text-sm">Total Registered Voters</h4>
+            <p id="totalVoters" class="text-2xl font-bold text-primary">2</p>
+          </div>
+          <div class="bg-gray-100 p-4 rounded-lg">
+            <h4 class="text-gray-500 text-sm">Votes Cast</h4>
+            <p id="votesCast" class="text-2xl font-bold text-primary">0</p>
+          </div>
+          <div class="bg-gray-100 p-4 rounded-lg">
+            <h4 class="text-gray-500 text-sm">Voter Participation</h4>
+            <p id="voterParticipation" class="text-2xl font-bold text-primary">0%</p>
+          </div>
+        </div>
+        
+        <h4 class="font-medium mb-2 text-gray-700">Live Results</h4>
+        <div id="adminResults" class="space-y-4"></div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-xl font-bold mb-4 text-primary">Recent Activities</h3>
+        <div id="activityLog" class="space-y-3 max-h-96 overflow-y-auto">
+          <!-- Activity items will be dynamically added here -->
+          <div class="p-3 border-l-4 border-green-500 bg-green-50">
+            <p class="text-sm text-gray-700"><span class="font-medium">Voter registration:</span> "shrutz" added to whitelist</p>
+            <p class="text-xs text-gray-500">10 minutes ago</p>
+          </div>
+          <div class="p-3 border-l-4 border-yellow-500 bg-yellow-50">
+            <p class="text-sm text-gray-700"><span class="font-medium">Login attempt:</span> "vedya" from IP 198.51.100.123</p>
+            <p class="text-xs text-gray-500">15 minutes ago</p>
+          </div>
+          <div class="p-3 border-l-4 border-blue-500 bg-blue-50">
+            <p class="text-sm text-gray-700"><span class="font-medium">System:</span> Election started by Admin</p>
+            <p class="text-xs text-gray-500">30 minutes ago</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script>
+  // Party data
+  const parties = [
+    { name: "Shivsena ES", image: "https://via.placeholder.com/150?text=Shivsena+ES", votes: 0 },
+    { name: "BJP", image: "https://via.placeholder.com/150?text=BJP", votes: 0 },
+    { name: "NCP - SCP", image: "https://via.placeholder.com/150?text=NCP-SCP", votes: 0 },
+    { name: "NCP - AP", image: "https://via.placeholder.com/150?text=NCP-AP", votes: 0 },
+    { name: "INC", image: "https://via.placeholder.com/150?text=INC", votes: 0 },
+    { name: "Shivsena - UBT", image: "https://via.placeholder.com/150?text=Shivsena-UBT", votes: 0 }
+  ];
+
+  // User data
+  const validUsers = [
+    { voterId: 'shrutz', password: '123', hasVoted: false },
+    { voterId: 'vedya', password: '777', hasVoted: false }
+  ];
+
+  // Admin data
+  const validAdmins = [
+    { adminId: 'admin', password: 'admin123' }
+  ];
+
+  // Global variables
+  let currentUser = null;
+  let provider = null;
+  let signer = null;
+  let contract = null;
+  let isAdmin = false;
+  const CONTRACT_ADDRESS = "0xfed175B1dB83145A0Bd56871FE805e8aF46079a3";
+  const REQUIRED_CHAIN_ID = "0x1"; // Ethereum Mainnet
+
+  // ABI for ERC20 token (used as a base for voting contract)
+  const CONTRACT_ABI = [
+    // Basic ERC20 functions
+    "function balanceOf(address owner) view returns (uint256)",
+    "function transfer(address to, uint256 amount) returns (bool)",
+    
+    // Voting specific functions
+    "function vote(uint256 partyId) returns (bool)",
+    "function getVoteCount(uint256 partyId) view returns (uint256)",
+    "function hasVoted(address voter) view returns (bool)",
+    "function registerVoter(address voter) returns (bool)",
+    "function isRegisteredVoter(address voter) view returns (bool)",
+    "function getTotalVotes() view returns (uint256)",
+    "function startElection() returns (bool)",
+    "function pauseElection() returns (bool)",
+    "function endElection() returns (bool)",
+    "function electionStatus() view returns (uint8)",
+    
+    // Events
+    "event VoteCast(address indexed voter, uint256 partyId, uint256 timestamp)",
+    "event VoterRegistered(address indexed voter, uint256 timestamp)",
+    "event ElectionStatusChanged(uint8 status, uint256 timestamp)"
+  ];
+
+  // DOM Elements
+  document.addEventListener("DOMContentLoaded", () => {
+    // Event listeners
+    document.getElementById("loginForm").addEventListener("submit", handleLogin);
+    document.getElementById("adminForm").addEventListener("submit", handleAdminLogin);
+    document.getElementById("addVoterBtn").addEventListener("click", addVoter);
+    document.getElementById("startElectionBtn").addEventListener("click", startElection);
+    document.getElementById("pauseElectionBtn").addEventListener("click", pauseElection);
+    document.getElementById("endElectionBtn").addEventListener("click", endElection);
+
+    // Initialize
+    renderParties();
+    setInterval(updateResults, 3000);
+    
+    // Check for Ethereum provider
+    if (window.ethereum) {
+      initEthers();
+    }
+  });
+
+  // Initialize ethers.js with MetaMask
+  async function initEthers() {
+    try {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      
+      // Check if user is already connected
+      const accounts = await provider.listAccounts();
+      if (accounts.length > 0) {
+        signer = provider.getSigner();
+        const address = await signer.getAddress();
+        updateWalletStatus(address);
+        
+        // Check network
+        const network = await provider.getNetwork();
+        const chainIdHex = '0x' + network.chainId.toString(16);
+        if (chainIdHex !== REQUIRED_CHAIN_ID) {
+          showNetworkErrorModal();
+        } else {
+          initContract();
+        }
+      }
+    } catch (error) {
+      console.error("Error initializing ethers:", error);
+    }
+  }
+
+  // Initialize contract
+  function initContract() {
+    if (provider && signer) {
+      contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    }
+  }
+
+  // Connect wallet
+  async function connectWallet() {
+    try {
+      showLoading("Connecting wallet...");
+      
+      // Check if MetaMask is installed
+      if (!window.ethereum) {
+        alert("Please install MetaMask to use this app");
+        hideLoading();
+        return;
+      }
+      
+      // Request account access
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      
+      if (accounts.length > 0) {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        const address = await signer.getAddress();
+        updateWalletStatus(address);
+        
+        // Check network
+        const network = await provider.getNetwork();
+        const chainIdHex = '0x' + network.chainId.toString(16);
+        if (chainIdHex !== REQUIRED_CHAIN_ID) {
+          hideLoading();
+          showNetworkErrorModal();
+        } else {
+          initContract();
+          closeWalletModal();
+          hideLoading();
+        }
+      }
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      alert("Failed to connect wallet. Please try again.");
+      hideLoading();
+    }
+  }
+
+  // Switch network
+  async function switchNetwork() {
+    try {
+      showLoading("Switching network...");
+      
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: REQUIRED_CHAIN_ID }],
+      });
+      
+      // Reinitialize provider and signer
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      initContract();
+      
+      closeNetworkErrorModal();
+      hideLoading();
+    } catch (error) {
+      console.error("Error switching network:", error);
+      hideLoading();
+      alert("Failed to switch network. Please try manually through MetaMask.");
+    }
+  }
+
+  // Update wallet status UI
+  async function updateWalletStatus(address) {
+    const shortAddress = address.substring(0, 6) + '...' + address.substring(address.length - 4);
+    
+    const walletStatus = document.getElementById("walletStatus");
+    walletStatus.textContent = `Wallet: ${shortAddress}`;
+    walletStatus.classList.add("text-green-600", "font-medium");
+    
+    const adminWalletStatus = document.getElementById("adminWalletStatus");
+    adminWalletStatus.textContent = `Wallet: ${shortAddress}`;
+    adminWalletStatus.classList.add("text-green-600", "font-medium");
+  }
+
+  // Show loading modal
+  function showLoading(message = "Processing...") {
+    document.getElementById("loadingText").textContent = message;
+    document.getElementById("loadingModal").classList.remove("hidden");
+  }
+
+  // Hide loading modal
+  function hideLoading() {
+    document.getElementById("loadingModal").classList.add("hidden");
+  }
+
+  // Show wallet connection modal
+  function showWalletModal() {
+    document.getElementById("walletModal").classList.remove("hidden");
+  }
+
+  // Close wallet connection modal
+  function closeWalletModal() {
+    document.getElementById("walletModal").classList.add("hidden");
+  }
+
+  // Show network error modal
+  function showNetworkErrorModal() {
+    document.getElementById("networkErrorModal").classList.remove("hidden");
+  }
+
+  // Close network error modal
+  function closeNetworkErrorModal() {
+    document.getElementById("networkErrorModal").classList.add("hidden");
+  }
+
+  // Switch tab between voter and admin login
+  function showTab(tab) {
+    if (tab === 'voter') {
+      document.getElementById("voterLoginForm").classList.remove("hidden");
+      document.getElementById("adminLoginForm").classList.add("hidden");
+      document.getElementById("voterTabBtn").classList.add("bg-primary", "text-white");
+      document.getElementById("voterTabBtn").classList.remove("bg-gray-200", "text-gray-700");
+      document.getElementById("adminTabBtn").classList.add("bg-gray-200", "text-gray-700");
+      document.getElementById("adminTabBtn").classList.remove("bg-primary", "text-white");
+    } else {
+      document.getElementById("voterLoginForm").classList.add("hidden");
+      document.getElementById("adminLoginForm").classList.remove("hidden");
+      document.getElementById("adminTabBtn").classList.add("bg-primary", "text-white");
+      document.getElementById("adminTabBtn").classList.remove("bg-gray-200", "text-gray-700");
+      document.getElementById("voterTabBtn").classList.add("bg-gray-200", "text-gray-700");
+      document.getElementById("voterTabBtn").classList.remove("bg-primary", "text-white");
+    }
+  }
+
+  // Handle voter login
+  function handleLogin(e) {
+    e.preventDefault();
+    const voterId = document.getElementById('voterId').value;
+    const password = document.getElementById('password').value;
+    const user = validUsers.find(u => u.voterId === voterId && u.password === password);
+
+    if (user) {
+      currentUser = user;
+      document.getElementById('otpSection').classList.remove('hidden');
+      
+      // If wallet is not connected, show wallet modal
+      if (!signer) {
+        showWalletModal();
+      }
+    } else {
+      alert("Invalid Voter ID or Password");
+    }
+  }
+
+  // Handle admin login
+  function handleAdminLogin(e) {
+    e.preventDefault();
+    const adminId = document.getElementById('adminId').value;
+    const password = document.getElementById('adminPassword').value;
+    const admin = validAdmins.find(a => a.adminId === adminId && a.password === password);
+
+    if (admin) {
+      isAdmin = true;
+      
+      // If wallet is not connected, show wallet modal
+      if (!signer) {
+        showWalletModal();
+      } else {
+        document.getElementById("loginPanel").classList.add("hidden");
+        document.getElementById("adminDashboard").classList.remove("hidden");
+        populateAdminDashboard();
+      }
+    } else {
+      alert("Invalid Admin ID or Password");
+    }
+  }
+
+  // Verify OTP
+  async function verifyOTP() {
+    const otp = document.getElementById('otp').value;
+    
+    if (otp === "1234" || otp.length >= 4) {
+      if (!signer) {
+        showWalletModal();
+        return;
+      }
+      
+      // Check if current user is already registered on blockchain
+      try {
+        showLoading("Verifying voter status...");
+        
+        if (contract) {
+          const address = await signer.getAddress();
+          const isRegistered = await contract.isRegisteredVoter(address);
+          
+          if (!isRegistered) {
+            hideLoading();
+            alert("Your wallet is not registered as a voter. Please contact admin.");
+            return;
+          }
+          
+          const hasVoted = await contract.hasVoted(address);
+          currentUser.hasVoted = hasVoted;
+        }
+        
+        document.getElementById("loginPanel").classList.add("hidden");
+        document.getElementById("votingDashboard").classList.remove("hidden");
+        renderParties();
+
+        if (currentUser && currentUser.hasVoted) {
+          showModal(); // show popup if already voted
+        }
+        hideLoading();
+      } catch (error) {
+        console.error("Error verifying voter status:", error);
+        hideLoading();
+        
+        // For demo purposes, allow login even if blockchain check fails
+        document.getElementById("loginPanel").classList.add("hidden");
+        document.getElementById("votingDashboard").classList.remove("hidden");
+        renderParties();
+
+        if (currentUser && currentUser.hasVoted) {
+          showModal();
+        }
+      }
+    } else {
+      alert("Invalid OTP");
+    }
+  }
+
+  // Populate admin dashboard with data
+  async function populateAdminDashboard() {
+    try {
+      if (contract) {
+        showLoading("Loading admin data...");
+        
+        // Fetch and update total votes
+        const totalVotes = await contract.getTotalVotes();
+        document.getElementById("votesCast").textContent = totalVotes.toString();
+        
+        // Calculate participation percentage
+        const totalVoters = document.getElementById("totalVoters").textContent;
+        const participation = totalVoters > 0 ? Math.round((totalVotes / totalVoters) * 100) : 0;
+        document.getElementById("voterParticipation").textContent = `${participation}%`;
+        
+        // Update party results
+        updateAdminResults();
+        
+        // Fetch election status
+        const status = await contract.electionStatus();
+        updateElectionStatusButtons(status);
+        
+        hideLoading();
+      }
+    } catch (error) {
+      console.error("Error populating admin dashboard:", error);
+      hideLoading();
+    }
+  }
+
+  // Update election status buttons based on current status
+  function updateElectionStatusButtons(status) {
+    const startBtn = document.getElementById("startElectionBtn");
+    const pauseBtn = document.getElementById("pauseElectionBtn");
+    const endBtn = document.getElementById("endElectionBtn");
+    
+    // Status: 0 = Not Started, 1 = Active, 2 = Paused, 3 = Ended
+    switch (Number(status)) {
+      case 0: // Not Started
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        endBtn.disabled = true;
+        startBtn.classList.remove("opacity-50");
+        pauseBtn.classList.add("opacity-50");
+        endBtn.classList.add("opacity-50");
+        break;
+      case 1: // Active
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        endBtn.disabled = false;
+        startBtn.classList.add("opacity-50");
+        pauseBtn.classList.remove("opacity-50");
+        endBtn.classList.remove("opacity-50");
+        break;
+      case 2: // Paused
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        endBtn.disabled = false;
+        startBtn.classList.remove("opacity-50");
+        pauseBtn.classList.add("opacity-50");
+        endBtn.classList.remove("opacity-50");
+        break;
+      case 3: // Ended
+        startBtn.disabled = true;
+        pauseBtn.disabled = true;
+        endBtn.disabled = true;
+        startBtn.classList.add("opacity-50");
+        pauseBtn.classList.add("opacity-50");
+        endBtn.classList.add("opacity-50");
+        break;
+    }
+  }
+
+  // Render party cards
+  function renderParties() {
+    const container = document.getElementById('partyGrid');
+    container.innerHTML = '';
+    parties.forEach((party, index) => {
+      const card = document.createElement('div');
+      card.className = 'party-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center';
+      const disabled = currentUser && currentUser.hasVoted ? 'disabled opacity-50 cursor-not-allowed' : '';
+      card.innerHTML = `
+        <img src="${party.image}" alt="${party.name}" class="w-32 h-32 object-cover rounded-lg mb-4">
+        <h3 class="text-lg font-bold mb-2 text-gray-800">${party.name}</h3>
+        <button ${disabled} onclick="castVote(${index})" class="vote-btn bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary-dark ${disabled}">
+          Vote
+        </button>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // Cast vote for a party
+  async function castVote(partyIndex) {
+    if (currentUser && currentUser.hasVoted) {
+      showModal();
+      return;
+    }
+
+    if (!signer || !contract) {
+      alert("Wallet not connected. Please connect your wallet to vote.");
+      showWalletModal();
+      return;
+    }
+
+    try {
+      showLoading("Casting your vote...");
+      
+      // Call contract vote function
+      const voteTx = await contract.vote(partyIndex);
+      await voteTx.wait();
+      
+      // Update local state
+      parties[partyIndex].votes += 1;
+      currentUser.hasVoted = true;
+      
+      hideLoading();
+      alert(`You voted for ${parties[partyIndex].name}`);
+      
+      // Update UI
+      renderParties();
+      updateResults();
+    } catch (error) {
+      console.error("Error casting vote:", error);
+      hideLoading();
+      
+      if (error.message.includes("already voted")) {
+        alert("You have already voted in this election!");
+        currentUser.hasVoted = true;
+        renderParties();
+      } else if (error.message.includes("not registered")) {
+        alert("Your wallet is not registered as a voter. Please contact admin.");
+      } else if (error.message.includes("not active")) {
+        alert("Voting is not currently active. Please try again later.");
+      } else {
+        alert("Failed to cast vote. Please try again.");
+      }
+    }
+  }
+
+  // Update voting results
+  async function updateResults() {
+    const resultsContainer = document.getElementById('results');
+    resultsContainer.innerHTML = '';
+    
+    try {
+      if (contract) {
+        for (let i = 0; i < parties.length; i++) {
+          const party = parties[i];
+          try {
+            const voteCount = await contract.getVoteCount(i);
+            party.votes = voteCount.toNumber();
+          } catch (error) {
+            console.error(`Error getting vote count for party ${i}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error updating results:", error);
+    }
+    
+    parties.forEach(party => {
+      const result = document.createElement('div');
+      result.className = 'flex items-center justify-between';
+      result.innerHTML = `
+        <span class="w-1/4">${party.name}</span>
+        <div class="w-2/3 bg-gray-200 rounded-full h-4 overflow-hidden">
+          <div class="bg-primary h-4 rounded-full" style="width:${Math.min(100, party.votes * 10)}%"></div>
+        </div>
+        <span class="ml-2 w-1/6 text-right">${party.votes} votes</span>
+      `;
+      resultsContainer.appendChild(result);
+    });
+
+    // Update admin results if visible
+    if (!document.getElementById('adminDashboard').classList.contains('hidden')) {
+      updateAdminResults();
+    }
+  }
+
+  // Update admin results
+  function updateAdminResults() {
+    const resultsContainer = document.getElementById('adminResults');
+    if (!resultsContainer) return;
+    
+    resultsContainer.innerHTML = '';
+    parties.forEach(party => {
+      const result = document.createElement('div');
+      result.className = 'flex items-center justify-between';
+      result.innerHTML = `
+        <span class="w-1/4">${party.name}</span>
+        <div class="w-2/3 bg-gray-200 rounded-full h-4 overflow-hidden">
+          <div class="bg-primary h-4 rounded-full" style="width:${Math.min(100, party.votes * 10)}%"></div>
+        </div>
+        <span class="ml-2 w-1/6 text-right">${party.votes} votes</span>
+      `;
+      resultsContainer.appendChild(result);
+    });
+  }
+
+  // Admin function: Add new voter
+  async function addVoter() {
+    const voterId = document.getElementById('newVoterId').value;
+    const walletAddress = document.getElementById('voterWalletAddress').value;
+    
+    if (!voterId || !walletAddress) {
+      alert("Please enter both Voter ID and Wallet Address");
+      return;
+    }
+    
+    if (!ethers.utils.isAddress(walletAddress)) {
+      alert("Invalid wallet address format");
+      return;
+    }
+    
+    try {
+      showLoading("Registering voter...");
+      
+      if (contract) {
+        const registerTx = await contract.registerVoter(walletAddress);
+        await registerTx.wait();
+        
+        // Add to local list
+        validUsers.push({ voterId: voterId, password: "password", hasVoted: false });
+        
+        // Update UI
+        document.getElementById('totalVoters').textContent = validUsers.length;
+        document.getElementById('newVoterId').value = '';
+        document.getElementById('voterWalletAddress').value = '';
+        
+        // Add to activity log
+        addActivityLog(`Voter registration: "${voterId}" added to whitelist`, "success");
+        
+        hideLoading();
+        alert(`Voter ${voterId} registered successfully`);
+      } else {
+        throw new Error("Contract not initialized");
+      }
+    } catch (error) {
+      console.error("Error registering voter:", error);
+      hideLoading();
+      alert("Failed to register voter. Please try again.");
+    }
+  }
+
+  // Admin function: Start election
+  async function startElection() {
+    try {
+      showLoading("Starting election...");
+      
+      if (contract) {
+        const tx = await contract.startElection();
+        await tx.wait();
+        
+        // Add to activity log
+        addActivityLog("System: Election started by Admin", "info");
+        
+        hideLoading();
+        alert("Election started successfully");
+        
+        // Update UI
+        populateAdminDashboard();
+      } else {
+        throw new Error("Contract not initialized");
+      }
+    } catch (error) {
+      console.error("Error starting election:", error);
+      hideLoading();
+      alert("Failed to start election. Please try again.");
+    }
+  }
+
+  // Admin function: Pause election
+  async function pauseElection() {
+    try {
+      showLoading("Pausing election...");
+      
+      if (contract) {
+        const tx = await contract.pauseElection();
+        await tx.wait();
+        
+        // Add to activity log
+        addActivityLog("System: Election paused by Admin", "warning");
+        
+        hideLoading();
+        alert("Election paused successfully");
+        
+        // Update UI
+        populateAdminDashboard();
+      } else {
+        throw new Error("Contract not initialized");
+      }
+    } catch (error) {
+      console.error("Error pausing election:", error);
+      hideLoading();
+      alert("Failed to pause election. Please try again.");
+    }
+  }
+
+  // Admin function: End election
+  async function endElection() {
+    try {
+      showLoading("Ending election...");
+      
+      if (contract) {
+        const tx = await contract.endElection();
+        await tx.wait();
+        
+        // Add to activity log
+        addActivityLog("System: Election ended by Admin", "danger");
+        
+        hideLoading();
+        alert("Election ended successfully");
+        
+        // Update UI
+        populateAdminDashboard();
+      } else {
+        throw new Error("Contract not initialized");
+      }
+    } catch (error) {
+      console.error("Error ending election:", error);
+      hideLoading();
+      alert("Failed to end election. Please try again.");
+    }
+  }
+
+  // Add entry to admin activity log
+  function addActivityLog(message, type) {
+    const activityLog = document.getElementById('activityLog');
+    if (!activityLog) return;
+    
+    const now = new Date();
+    const timeString = 'Just now';
+    
+    // Determine border color based on type
+    let borderClass = 'border-blue-500 bg-blue-50';
+    if (type === 'success') borderClass = 'border-green-500 bg-green-50';
+    if (type === 'warning') borderClass = 'border-yellow-500 bg-yellow-50';
+    if (type === 'danger') borderClass = 'border-red-500 bg-red-50';
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = `p-3 border-l-4 ${borderClass}`;
+    logEntry.innerHTML = `
+      <p class="text-sm text-gray-700">${message}</p>
+      <p class="text-xs text-gray-500">${timeString}</p>
+    `;
+    
+    // Add to beginning of log
+    activityLog.insertBefore(logEntry, activityLog.firstChild);
+  }
+
+  // Logout function
+  function logout() {
+    document.getElementById('votingDashboard').classList.add('hidden');
+    document.getElementById('adminDashboard').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+    document.getElementById('loginForm').reset();
+    document.getElementById('adminForm').reset();
+    document.getElementById('otpSection').classList.add('hidden');
+    showTab('voter');
+    currentUser = null;
+    isAdmin = false;
+  }
+
+  // Show "Already Voted" modal
+  function showModal() {
+    document.getElementById('alreadyVotedModal').classList.remove('hidden');
+  }
+
+  // Close "Already Voted" modal
+  function closeModal() {
+    document.getElementById('alreadyVotedModal').classList.add('hidden');
+  }
+</script>
+
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
